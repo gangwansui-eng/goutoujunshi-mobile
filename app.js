@@ -366,16 +366,16 @@ const JEV_CRITERIA = {
   "收线": "Stop pursuing after an explicit refusal or boundary, or repeated one-sided investment/cancellations. A single busy reply alone does not establish this pattern.",
 };
 const SCENE_MAP = {
-  "日常接话": { mac: "日常回复", ref: "日常回复.md" },
-  "对方倾诉": { mac: "日常回复", ref: "日常回复.md" },
-  "轻松调侃": { mac: "日常回复", ref: "日常回复.md" },
-  "对方说忙": { mac: "日常回复", ref: "日常回复.md" },
-  "回应冷淡": { mac: "日常回复", ref: "日常回复.md" },
-  "主动邀约": { mac: "邀约推进", ref: "邀约推进.md" },
-  "临时取消": { mac: "冲突修复", ref: "冲突修复.md" },
-  "冲突修复": { mac: "冲突修复", ref: "冲突修复.md" },
-  "确认关系": { mac: "投入与退出", ref: "投入与退出.md" },
-  "体面退出": { mac: "投入与退出", ref: "投入与退出.md" },
+  "日常接话": { mac: "日常回复", ref: "daily.md" },
+  "对方倾诉": { mac: "日常回复", ref: "daily.md" },
+  "轻松调侃": { mac: "日常回复", ref: "daily.md" },
+  "对方说忙": { mac: "日常回复", ref: "daily.md" },
+  "回应冷淡": { mac: "日常回复", ref: "daily.md" },
+  "主动邀约": { mac: "邀约推进", ref: "invite.md" },
+  "临时取消": { mac: "冲突修复", ref: "repair.md" },
+  "冲突修复": { mac: "冲突修复", ref: "repair.md" },
+  "确认关系": { mac: "投入与退出", ref: "exit.md" },
+  "体面退出": { mac: "投入与退出", ref: "exit.md" },
 };
 const TONE_GUIDANCE_MAC = {
   "稳健": "朴素、贴题，像平时接话；不写客服式确认或过度安慰。",
@@ -402,7 +402,7 @@ async function loadBasis(refFile) {
   if (!basisCache.common) {
     basisCache.common = Promise.all([
       fetchText("./references/SKILL.md"),
-      fetchText("./references/实战话术编排器.md"),
+      fetchText("./references/guide.md"),
     ]);
   }
   if (!basisCache[refFile]) basisCache[refFile] = fetchText(`./references/${refFile}`);
