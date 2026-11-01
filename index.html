@@ -6,15 +6,15 @@
     <meta name="theme-color" content="#091720" />
     <meta name="description" content="可添加到手机主屏幕的回复助手，支持 DeepSeek 联机生成与离线应急。" />
     <meta name="referrer" content="no-referrer" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://api.deepseek.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://api.deepseek.com https://openrouter.ai; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="狗头军师" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icon.svg" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23091720'/%3E%3Cpath d='M18 19h28v20H32l-9 8v-8h-5z' fill='%239ce5d8'/%3E%3Ccircle cx='26' cy='29' r='2.3' fill='white'/%3E%3Ccircle cx='38' cy='29' r='2.3' fill='white'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="./styles.css?v=10" />
-    <title>狗头军师 · 私人版</title>
+    <link rel="stylesheet" href="./styles.css?v=11" />
+    <title>狗头军师 · 自用版</title>
   </head>
   <body>
     <header class="topbar">
@@ -110,6 +110,16 @@
           <p class="model-note" id="keyNote">无需登录。首次成功后密钥保存在本机；联机时内容会直接发给 DeepSeek。建议使用限额密钥。</p>
         </details>
 
+        <details class="access-box" id="orBox">
+          <summary>OpenRouter 密钥（判断用）</summary>
+          <label class="field-label" for="orKey">API 密钥</label>
+          <div class="access-row">
+            <input id="orKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-or-…（不要发到聊天里）" />
+            <button id="clearOrKey" class="text-action" type="button">清除</button>
+          </div>
+          <p class="model-note">判断功能用 OpenRouter 的 Jev 模型（typesafe/jev-1.13）；密钥只存本机，不填也能正常生成回复。</p>
+        </details>
+
         <button class="primary-action" id="generateButton" type="button">
           <span id="generateLabel">生成一条回复</span>
         </button>
@@ -120,55 +130,29 @@
       <section class="answer-panel" aria-labelledby="answerTitle" aria-live="polite">
         <div class="answer-topline">
           <div>
-            <p class="eyebrow" id="answerSource">首选回复 · 离线建议</p>
+            <p class="eyebrow" id="answerSource">候选回复 · 离线建议</p>
             <h2 id="answerTitle">先发这句</h2>
           </div>
-          <span id="signalBadge" class="signal-badge">等待原话</span>
         </div>
 
-        <div class="draft-card" id="draftCard">
-          <blockquote id="draftText">把对方的原话填好后，我会先给你一条可以直接复制的回复。</blockquote>
-          <div class="draft-actions">
-            <button id="copyButton" class="secondary-action" type="button" disabled>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
-              复制回复
-            </button>
-            <button id="saveButton" class="text-action" type="button" disabled>保存到本机</button>
-          </div>
-        </div>
+        <p class="model-note" id="judgeLine" hidden></p>
+        <div id="candidateList"></div>
 
         <p class="next-inline" id="nextInline" hidden><span>下一步</span><span id="nextText">发出后观察对方是否给出具体回应。</span></p>
 
         <details class="insight-details" id="insightDetails" hidden>
-          <summary>军师判断 <span id="strategyText"></span></summary>
-          <section class="decision-card" id="decisionCard" aria-label="军师判断" hidden>
-            <p class="decision-heading">为什么这样回</p>
-            <p id="reasonText"></p>
-            <p class="decision-timing" id="sendWhenText"></p>
-          </section>
+          <summary>分析详情 <span id="strategyText"></span></summary>
+          <p id="supportText"></p>
+          <p>对方可能的意图：<span id="intentText"></span></p>
+          <p class="model-note" id="intentConfidenceText"></p>
           <div class="signal-rail" aria-label="回复判断依据">
             <article><span class="rail-dot fact" aria-hidden="true"></span><p class="rail-label">看到的事实</p><p id="factText">目前还没有对方的原话。</p></article>
+            <article><span class="rail-dot maybe" aria-hidden="true"></span><p class="rail-label">合理推测</p><p id="hypothesesText"></p></article>
             <article><span class="rail-dot maybe" aria-hidden="true"></span><p class="rail-label">暂不脑补</p><p id="unknownText">不凭一句话猜测对方内心。</p></article>
           </div>
-        </details>
-
-        <details class="insight-details" id="followupDetails" hidden>
-          <summary>后续怎么走</summary>
-          <section class="followup-panel" id="followupPanel" aria-label="后续分支" hidden>
-          <dl>
-            <div><dt>积极回应</dt><dd id="positiveText"></dd></div>
-            <div><dt>回应含糊</dt><dd id="vagueText"></dd></div>
-            <div><dt>没有回应</dt><dd id="noReplyText"></dd></div>
-          </dl>
+          <p>首选行动：<span id="recommendationText"></span></p>
           <p class="followup-stop" id="stopWhenText"></p>
           <p class="followup-question" id="questionText" hidden></p>
-          </section>
-        </details>
-
-        <details class="alternate insight-details" id="alternateBox" hidden>
-          <summary>换个说法</summary>
-          <p id="alternateText"></p>
-          <button id="useAlternate" class="text-action" type="button">换成这一条</button>
         </details>
 
         <div class="saved-panel" id="savedPanel" hidden>
@@ -177,6 +161,15 @@
             <button id="closeSaved" class="text-action" type="button">收起</button>
           </div>
           <div id="savedList"></div>
+        </div>
+
+        <div class="saved-panel" id="historyPanel" hidden>
+          <div class="saved-heading">
+            <p class="field-label" id="historyHeading">最近对话（0 / 10 轮）</p>
+            <button id="closeHistory" class="text-action" type="button">收起</button>
+          </div>
+          <div id="historyList"></div>
+          <button id="clearHistory" class="danger-action" type="button">清空最近对话</button>
         </div>
       </section>
     </main>
@@ -188,9 +181,10 @@
       </div>
       <ul>
         <li>离线应急模式只用本机规则，不发送原话。</li>
-        <li>选 DeepSeek 时，原话、场景、关系、目标、语气和补充背景会从手机直接发送给 DeepSeek；请先隐去姓名、电话等敏感信息。</li>
+        <li>选 DeepSeek 时，原话、场景、关系、目标、语气、补充背景和最近对话会从手机直接发送给 DeepSeek；请先隐去姓名、电话等敏感信息。</li>
+        <li>判断功能用 OpenRouter 的 Jev 模型：原话和最近对话会从手机直接发送给 OpenRouter；OpenRouter 密钥只存本机，不填不影响回复生成。</li>
         <li>网页无需登录。API 密钥首次成功使用后保存在当前浏览器，不会写进 GitHub；拿到手机的人、恶意扩展或被篡改的网页代码可能读取它。请用专用、低额度密钥。</li>
-        <li>输入不会自动保存；你主动保存的草稿只存在当前浏览器。发送前请核对回复是否符合你的真实意思。</li>
+        <li>对方原话会在生成成功后自动记入最近对话（最多 10 轮），点“已按此发送”会连你发的那句一起记下；都只存在当前浏览器，可在最近对话面板里清空。发送前请核对回复是否符合你的真实意思。</li>
       </ul>
       <button id="clearSaved" class="danger-action" type="button">清空本机保存</button>
       <button id="clearAccessCodePrivacy" class="danger-action" type="button">清除本机 API 密钥</button>
@@ -207,10 +201,11 @@
     <footer>
       <p>独立私人版。建议仅供参考，不替代心理、医疗或法律专业意见。</p>
       <button id="showSaved" type="button">查看本机保存的回复</button>
+      <button id="showHistory" type="button">查看最近对话</button>
       <button id="showInstall" type="button">如何添加到主屏幕</button>
     </footer>
 
-    <script src="./config.js?v=10" defer></script>
-    <script src="./app.js?v=10" defer></script>
+    <script src="./config.js?v=11" defer></script>
+    <script src="./app.js?v=11" defer></script>
   </body>
 </html>
