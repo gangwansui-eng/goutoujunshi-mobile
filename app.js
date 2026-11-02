@@ -352,9 +352,9 @@ function renderHistory() {
 
 // 自用版 v2：Mac 版管线（goutoujunshi-jev-chat/integrations/jev_mac）。
 // 读屏/OCR/悬浮窗一律不要（iOS 做不了），只取三样：依据文件、判断模型、回复模型。
-// 判断：Jev 先选策略（7 策略 choice + 置信度 + 全策略概率分布）；回复：DeepSeek 按 Mac 输出契约生成 0–3 条候选，再单独调一次回复模型打分排序。
-// Jev 原生接口不对任意网页开放跨域（实测预检返回 Disallowed CORS origin），
-// 因此网页版走 OpenRouter decisions 路线，模型仍是 typesafe/jev-1.13（同一个 Jev），用用户已有的 OpenRouter 密钥。
+// 判断：Mercury Decide（免费版）先选策略（7 策略 choice + 置信度 + 全策略概率分布）；回复：DeepSeek 按 Mac 输出契约生成 0–3 条候选，再单独调一次回复模型打分排序。
+// OpenRouter decisions 路线与 Jev 同一套接口（state + choice 问题），判断模型换成 inception/mercury-decide:free（标价 $0）。
+// 判断失败或未填密钥时，策略由回复模型（DeepSeek）自定；回复模型始终是 DeepSeek，不变。
 const STRATEGIES = ["承接", "降压", "调侃", "轻推", "约见", "澄清", "收线"];
 const JEV_CRITERIA = {
   "承接": "Acknowledge the other person's feelings or what they shared; listen without rushing to solve or escalate.",
@@ -384,7 +384,7 @@ const TONE_GUIDANCE_MAC = {
 };
 const TONE_TO_MAC = { "稳妥": "稳健", "会撩": "会撩", "直接": "直接" };
 const JEV_URL = "https://openrouter.ai/api/alpha/decisions";
-const JEV_MODEL = "typesafe/jev-1.13";
+const JEV_MODEL = "inception/mercury-decide:free";
 const JEV_KEY_STORAGE = "goutoujunshi.openrouterKey";
 const INTENT_CONFIDENCE_NOTE = "这是回复模型对当前意图推测的自评把握，未经过统计校准；不是对方真实意图的已验证概率，也不是回复成功率。";
 
@@ -509,7 +509,7 @@ function parseJevDecision(data) {
     const answers = data.answers || data.result || data.data;
     const answer = answers.reply_strategy;
     const strategy = answer.choice;
-    if (!STRATEGIES.includes(strategy) || answer.type !== "choice") return null;
+    if (!STRATEGIES.includes(strategy) || (answer.type !== undefined && answer.type !== "choice")) return null;
     const confidence = typeof answer.confidence === "number" && Number.isFinite(answer.confidence)
       && answer.confidence >= 0 && answer.confidence <= 1 ? answer.confidence : null;
     let probabilities = null;
@@ -558,12 +558,12 @@ async function judgeStrategy(state) {
 }
 function renderJudge(decision, status) {
   if (status === "nokey") {
-    elements.judgeLine.textContent = "判断未启用：在下方填入 OpenRouter 密钥后，生成时 Jev 会先选策略。";
+    elements.judgeLine.textContent = "判断未启用：在下方填入 OpenRouter 密钥后，生成时 Mercury 会先选策略。";
     elements.judgeLine.hidden = false;
     return;
   }
   if (!decision) {
-    elements.judgeLine.textContent = "Jev 判断暂不可用；策略由回复模型自定。";
+    elements.judgeLine.textContent = "Mercury 判断暂不可用；策略由回复模型自定。";
     elements.judgeLine.hidden = false;
     return;
   }
@@ -573,7 +573,7 @@ function renderJudge(decision, status) {
     const ordered = [...STRATEGIES].sort((a, b) => decision.probabilities[b] - decision.probabilities[a]);
     dist = "；分布：" + ordered.map((name) => `${name} ${Math.round(decision.probabilities[name] * 100)}%`).join(" · ");
   }
-  elements.judgeLine.textContent = `Jev 策略：${decision.strategy} · ${conf}${dist}。策略置信度只是模型对策略选择的不确定性，不是回复成功率。`;
+  elements.judgeLine.textContent = `Mercury 策略：${decision.strategy} · ${conf}${dist}。策略置信度只是模型对策略选择的不确定性，不是回复成功率。`;
   elements.judgeLine.hidden = false;
 }
 function renderMac(result, source, judge) {
@@ -814,7 +814,7 @@ async function generate(inputOverride) {
   const requestId = ++activeRequest;
   elements.generate.disabled = true;
   elements.generateLabel.textContent = `${providerNames[selectedProvider]} 正在思考…`;
-  setStatus("正在让 Jev 选策略、DeepSeek 生成回复，请稍等。");
+  setStatus("正在让 Mercury 选策略、DeepSeek 生成回复，请稍等。");
   const macScene = SCENE_MAP[input.scene] || SCENE_MAP["日常接话"];
   const basis = await loadBasis(macScene.ref);
   const transcript = buildTranscript(readHistory(), input.incoming);
@@ -840,7 +840,7 @@ async function generate(inputOverride) {
   };
   if (jevDecision) {
     system += `\n本轮主策略已由独立策略判断步骤选定，strategy 字段必须为：${jevDecision.strategy}。围绕它生成分析与回复；可以建议不回复并返回空候选。这些概率只反映模型对策略选择的不确定性，不是关系事实或回复成功率。`;
-    payload.strategy_decision = { strategy: jevDecision.strategy, confidence: jevDecision.confidence, probabilities: jevDecision.probabilities, model: jevDecision.model, method: "jev" };
+    payload.strategy_decision = { strategy: jevDecision.strategy, confidence: jevDecision.confidence, probabilities: jevDecision.probabilities, model: jevDecision.model, method: "mercury" };
   }
   const controller = new AbortController();
   activeController = controller;
@@ -875,7 +875,7 @@ async function generate(inputOverride) {
     const advice = parseMacAdvice(data.choices?.[0]?.message?.content || "");
     if (requestId !== activeRequest) return null;
     if (jevDecision && advice.strategy !== jevDecision.strategy) {
-      setStatus("回复未遵循 Jev 选定的策略，请重试。", true);
+      setStatus("回复未遵循 Mercury 选定的策略，请重试。", true);
       return null;
     }
     const ranked = await rankCandidatesViaDS(advice.candidates, transcript, macScene.mac, input.context, advice.strategy, input.tone);

@@ -1,5 +1,5 @@
-const CACHE = "goutoujunshi-private-v11";
-const ASSETS = ["./", "./index.html", "./styles.css?v=11", "./config.js?v=11", "./app.js?v=11", "./manifest.webmanifest", "./icon.svg"];
+const CACHE = "goutoujunshi-private-v12";
+const ASSETS = ["./", "./index.html", "./styles.css?v=11", "./config.js?v=11", "./app.js?v=12", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)));
